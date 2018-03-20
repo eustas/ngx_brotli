@@ -14,7 +14,7 @@ case "$1" in
 		mkdir logs &&
 		curl --compressed -o war-and-peace2600.txt http://www.gutenberg.org/files/2600/2600-0.txt &&
 		cd $ROOT/nginx &&
-		./auto/configure --add-module=$ROOT/ &&
+		./auto/configure --prefix=$ROOT/script/test --add-module=$ROOT/ &&
 		make &&
 		cd $ROOT &&
 		NGINX=$ROOT/nginx/objs/nginx &&
