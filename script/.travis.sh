@@ -11,9 +11,10 @@ case "$1" in
 		cd $ROOT/script &&
 		mkdir test &&
 		cd test &&
+		mkdir logs &&
 		curl --compressed -o war-and-peace2600.txt http://www.gutenberg.org/files/2600/2600-0.txt &&
 		cd $ROOT/nginx &&
-		./auto/configure --add-module=$ROOT/ &&
+		./auto/configure --add-module=$ROOT/ –-prefix=$ROOT/script/test &&
 		make &&
 		cd $ROOT &&
 		NGINX=$ROOT/nginx/objs/nginx &&
