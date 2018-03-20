@@ -7,7 +7,7 @@ case "$1" in
 	;;
     "script")
 		ROOT=`pwd`
-		git submodule update --init --recursive &&
+		git clone https://github.com/nginx/nginx.git &&
 		cd nginx &&
 		./auto/configure --add-module=$ROOT/ &&
 		make
