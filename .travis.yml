@@ -8,12 +8,14 @@ matrix:
     - os: linux
 
 before_install:
-- ./.travis.sh before_install
+- script/.travis.sh before_install
 install:
-- ./.travis.sh install
+- script/.travis.sh install
 script:
-- ./.travis.sh script
+- script/.travis.sh script
 after_success:
-- ./.travis.sh after_success
+- script/.travis.sh after_success
+after_failure:
+- script/.travis.sh after_failure
 before_deploy:
-- ./.travis.sh before_deploy
+- script/.travis.sh before_deploy

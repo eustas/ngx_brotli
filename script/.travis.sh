@@ -10,9 +10,15 @@ case "$1" in
 		git clone https://github.com/nginx/nginx.git &&
 		cd nginx &&
 		./auto/configure --add-module=$ROOT/ &&
-		make
+		make &&
+		cd .. &&
+		nginx/obj/nginx
 	;;
     "after_success")
+		killall nginx
+	;;
+	"after_failure")
+		killall nginx
 	;;
     "before_deploy")
 	;;
