@@ -1,0 +1,19 @@
+language: c
+sudo: false
+#branches:
+#  only:
+#  - master
+matrix:
+  include:
+    - os: linux
+
+before_install:
+- .travis.sh before_install
+install:
+- .travis.sh install
+script:
+- .travis.sh script
+after_success:
+- .travis.sh after_success
+before_deploy:
+- .travis.sh before_deploy

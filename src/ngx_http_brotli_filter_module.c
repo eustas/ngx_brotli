@@ -14,6 +14,12 @@
 #include <brotli/encode.h>
 #endif
 
+/* Brotli and GZip modules never stack, i.e. when one of them sets
+   "Content-Encoding" the other becomes a pass-through filter. Consequently,
+   it is almost legal to reuse this "buffered" bit.
+   IIUC, buffered == some data passed to filter has not been pushed further. */
+#define NGX_HTTP_BROTLI_BUFFERED NGX_HTTP_GZIP_BUFFERED
+
 /* Module configuration. */
 typedef struct {
   ngx_flag_t enable;
@@ -73,6 +79,8 @@ typedef struct {
 
   unsigned end_of_input:1;
   unsigned end_of_block:1;
+
+  ngx_http_request_t* request;
 } ngx_http_brotli_ctx_t;
 
 /* Forward declarations. */
@@ -82,6 +90,8 @@ typedef struct {
    and requires objects are allocated. Returns NGX_ERROR otherwise. */
 static ngx_int_t ngx_http_brotli_filter_ensure_stream_initialized(
     ngx_http_request_t* r, ngx_http_brotli_ctx_t* ctx);
+/* Marks instance as closed and performs cleanup. */
+static void ngx_http_brotli_filter_close(ngx_http_brotli_ctx_t* ctx);
 /* Deallocates encoder and marks filter instance as closed. */
 static void ngx_http_brotli_filter_cleanup(void* data);
 
@@ -263,6 +273,7 @@ static ngx_int_t ngx_http_brotli_header_filter(ngx_http_request_t* r) {
   if (ctx == NULL) {
     return NGX_ERROR;
   }
+  ctx->request = r;
   ctx->content_length = r->headers_out.content_length_n;
   ngx_http_set_ctx(r, ctx, ngx_http_brotli_filter_module);
 
@@ -299,6 +310,7 @@ static ngx_int_t ngx_http_brotli_body_filter(
   size_t consumed_input;
   BROTLI_BOOL ok;
   u_char* out;
+  ngx_chain_t* link;
 
   ctx = ngx_http_get_module_ctx(r, ngx_http_brotli_filter_module);
 
@@ -310,18 +322,17 @@ static ngx_int_t ngx_http_brotli_body_filter(
   }
 
   if (ngx_http_brotli_filter_ensure_stream_initialized(r, ctx) != NGX_OK) {
-    ctx->closed = 1;
+    ngx_http_brotli_filter_close(ctx);
     return NGX_ERROR;
   }
 
   /* If more input is provided - append it to our input chain. */
   if (in) {
     if (ngx_chain_add_copy(r->pool, &ctx->in, in) != NGX_OK) {
-      ctx->closed = 1;
+      ngx_http_brotli_filter_close(ctx);
       return NGX_ERROR;
     }
-    /* TODO(eustas): why not earlier? */
-    r->connection->buffered |= NGX_HTTP_GZIP_BUFFERED;
+    r->connection->buffered |= NGX_HTTP_BROTLI_BUFFERED;
   }
 
   /* Main loop:
@@ -346,13 +357,16 @@ static ngx_int_t ngx_http_brotli_body_filter(
       } else if (rc == NGX_AGAIN) {
         if (ctx->output_busy) {
           /* Can't continue compression, let the outer filer decide. */
-          return rc;
+          if (ctx->in != NULL) {
+            r->connection->buffered |= NGX_HTTP_BROTLI_BUFFERED;
+          }
+          return NGX_AGAIN;
         } else {
           /* Inner filter has given up, but we can continue processing. */
           continue;
         }
       } else {
-        ctx->closed = 1;
+        ngx_http_brotli_filter_close(ctx);
         return NGX_ERROR;
       }
     }
@@ -361,6 +375,7 @@ static ngx_int_t ngx_http_brotli_body_filter(
       available_output = 0;
       out = (u_char*) BrotliEncoderTakeOutput(ctx->encoder, &available_output);
       if (out == NULL || available_output == 0) {
+        ngx_http_brotli_filter_close(ctx);
         return NGX_ERROR;
       }
       ctx->out_buf->start = out;
@@ -372,8 +387,10 @@ static ngx_int_t ngx_http_brotli_body_filter(
       ctx->out_buf->flush = 0;
       if (ctx->end_of_input) {
         ctx->out_buf->last_buf = 1;
+        r->connection->buffered &= ~NGX_HTTP_BROTLI_BUFFERED;
       } else if (ctx->end_of_block) {
         ctx->out_buf->flush = 1;
+        r->connection->buffered &= ~NGX_HTTP_BROTLI_BUFFERED;
       }
       ctx->end_of_input = 0;
       ctx->end_of_block = 0;
@@ -386,6 +403,8 @@ static ngx_int_t ngx_http_brotli_body_filter(
 
     if (BrotliEncoderIsFinished(ctx->encoder)) {
       ctx->success = 1;
+      r->connection->buffered &= ~NGX_HTTP_BROTLI_BUFFERED;
+      ngx_http_brotli_filter_close(ctx);
       return NGX_DONE;
     }
 
@@ -397,7 +416,9 @@ static ngx_int_t ngx_http_brotli_body_filter(
     input_size = ngx_buf_size(ctx->in->buf);
     if (input_size == 0) {
       if (!ctx->in->buf->last_buf && !ctx->in->buf->flush) {
+        link = ctx->in;
         ctx->in = ctx->in->next;
+        ngx_free_chain(r->pool, link);
         continue;
       }
     }
@@ -409,8 +430,9 @@ static ngx_int_t ngx_http_brotli_body_filter(
         ctx->in->buf->last_buf ? BROTLI_OPERATION_FINISH :
         ctx->in->buf->flush ? BROTLI_OPERATION_FLUSH : BROTLI_OPERATION_PROCESS,
         &available_input, &next_input_byte, &available_output, NULL, NULL);
+    r->connection->buffered |= NGX_HTTP_BROTLI_BUFFERED;
     if (!ok) {
-      ctx->closed = 1;
+      ngx_http_brotli_filter_close(ctx);
       return NGX_ERROR;
     }
 
@@ -424,18 +446,21 @@ static ngx_int_t ngx_http_brotli_body_filter(
       } else if (ctx->in->buf->flush) {
         ctx->end_of_block = 1;
       }
+      link = ctx->in;
       ctx->in = ctx->in->next;
+      ngx_free_chain(r->pool, link);
       continue;
     }
 
     /* Should never happen, just to make sure we don't enter infinite loop. */
     if (consumed_input == 0) {
-      ctx->closed = 1;
+      ngx_http_brotli_filter_close(ctx);
       return NGX_ERROR;
     }
   }
 
   /* unreachable */
+  ngx_http_brotli_filter_close(ctx);
   return NGX_ERROR;
 }
 
@@ -543,6 +568,13 @@ static void ngx_http_brotli_filter_free(void* opaque, void* address) {
   ngx_pfree(pool, address);
 }
 
+static void ngx_http_brotli_filter_close(ngx_http_brotli_ctx_t* ctx) {
+  ctx->closed = 1;
+  if (!ctx->output_busy) {
+    ngx_http_brotli_filter_cleanup(ctx);
+  }
+}
+
 static void ngx_http_brotli_filter_cleanup(void* data) {
   ngx_http_brotli_ctx_t* ctx = data;
   if (ctx->encoder) {
@@ -550,11 +582,11 @@ static void ngx_http_brotli_filter_cleanup(void* data) {
     ctx->encoder = NULL;
   }
   if (ctx->out_chain) {
-    // TODO: free
+    ngx_free_chain(ctx->request->pool, ctx->out_chain);
     ctx->out_chain = NULL;
   }
   if (ctx->out_buf) {
-    // TODO: free
+    ngx_pfree(ctx->request->pool, ctx->out_buf);
     ctx->out_buf = NULL;
   }
 }
