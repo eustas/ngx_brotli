@@ -18,8 +18,8 @@ case "$1" in
 		make &&
 		cd $ROOT &&
 		NGINX=$ROOT/nginx/objs/nginx &&
-		$NGINX –p $ROOT/script/test -c $ROOT/script/test.conf &&
-		$NGINX –p $ROOT/script/test -c $ROOT/script/test.conf -s stop
+		$NGINX -c $ROOT/script/test.conf &&
+		$NGINX -c $ROOT/script/test.conf -s stop
 	;;
     "after_success")
 		killall nginx
