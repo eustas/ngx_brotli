@@ -14,12 +14,12 @@ case "$1" in
 		mkdir logs &&
 		curl --compressed -o war-and-peace2600.txt http://www.gutenberg.org/files/2600/2600-0.txt &&
 		cd $ROOT/nginx &&
-		./auto/configure --add-module=$ROOT/ –-prefix=$ROOT/script/test &&
+		./auto/configure --add-module=$ROOT/ &&
 		make &&
 		cd $ROOT &&
 		NGINX=$ROOT/nginx/objs/nginx &&
-		$NGINX -c $ROOT/script/test.conf &&
-		$NGINX -c $ROOT/script/test.conf -s stop
+		$NGINX –p $ROOT/script/test -c $ROOT/script/test.conf &&
+		$NGINX –p $ROOT/script/test -c $ROOT/script/test.conf -s stop
 	;;
     "after_success")
 		killall nginx
