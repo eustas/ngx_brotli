@@ -1,21 +1,19 @@
 language: c
 sudo: false
-#branches:
-#  only:
-#  - master
 matrix:
   include:
     - os: linux
 
-before_install:
-- script/.travis.sh before_install
-install:
-- script/.travis.sh install
-script:
-- script/.travis.sh script
-after_success:
-- script/.travis.sh after_success
-after_failure:
-- script/.travis.sh after_failure
-before_deploy:
-- script/.travis.sh before_deploy
+stages:
+  - compile
+  - before-test
+  - test
+
+jobs:
+  include:
+    - stage: compile
+      script: script/.travis-compile.sh
+    - stage: before-test
+      script: script/.travis-before-test.sh
+    - stage: test
+      script: script/.travis-test.sh
