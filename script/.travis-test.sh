@@ -1,11 +1,11 @@
 #!/bin/bash
-set -e
+set -ex
 
 # Setup shortcuts.
 ROOT=`pwd`
 NGINX=$ROOT/nginx/objs/nginx
 BROTLI=$ROOT/deps/brotli/out/brotli
-SERVER=http://localhost:8080/
+SERVER=http://localhost:8080
 FILES=$ROOT/script/test
 
 # Start server.
