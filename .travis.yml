@@ -4,16 +4,12 @@ matrix:
   include:
     - os: linux
 
-stages:
-  - compile
-  - before-test
-  - test
+script:
+- script/.travis-compile.sh
+- script/.travis-before-test.sh
+- script/.travis-test.sh
+after_success:
+- killall nginx
+after_failure:
+- killall nginx
 
-jobs:
-  include:
-    - stage: compile
-      script: script/.travis-compile.sh
-    - stage: before-test
-      script: script/.travis-before-test.sh
-    - stage: test
-      script: script/.travis-test.sh
