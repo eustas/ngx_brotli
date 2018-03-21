@@ -16,6 +16,12 @@ curl -H 'Accept-encoding: br' -o ./war-and-peace.br --limit-rate 300K $SERVER/wa
 $BROTLI -dfk ./war-and-peace.br
 cmp war-and-peace $FILES/war-and-peace.txt
 
+# 404 response (compare against vanilla version).
+curl -H 'Accept-encoding: br' -o ./notfound.br $SERVER/notfound
+$BROTLI -dfk ./notfound.br
+curl -o ./notfound.txt $SERVER/notfound
+cmp notfound notfound.txt
+
 # Stop server.
 $NGINX -c $ROOT/script/test.conf -s stop
 
