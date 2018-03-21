@@ -12,7 +12,7 @@ FILES=$ROOT/script/test
 $NGINX -c $ROOT/script/test.conf
 
 # Download long file with rate limit; ~5 sec.
-curl -H 'Accept-encoding: br' -o ./war-and-peace.br --limit-rate 300 $SERVER/war-and-peace.txt
+curl -H 'Accept-encoding: br' -o ./war-and-peace.br --limit-rate 300K $SERVER/war-and-peace.txt
 $BROTLI -dfk ./war-and-peace.br
 cmp war-and-peace $FILES/war-and-peace.txt
 
