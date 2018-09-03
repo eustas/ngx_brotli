@@ -61,6 +61,12 @@ ngx_module_name=ngx_http_brotli_filter_module
 
 brotli="/usr/local"
 
+if [  -f "/usr/include/brotli/encode.h" ]; then
+
+brotli="/usr"
+
+fi
+
 if [ ! -f "$brotli/include/brotli/encode.h" ]; then
 
 brotli="$ngx_addon_dir/deps/brotli/c"
