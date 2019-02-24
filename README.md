@@ -19,6 +19,18 @@ Both Brotli library and nginx module are under active development.
 
 ## Installation
 
+### CentOS / RHEL 7
+
+    yum install https://extras.getpagespeed.com/release-el7-latest.rpm
+    yum install nginx nginx-module-nbr
+    
+Follow installation package prompts to enable the dynamic Brotli modules in `nginx.conf`:
+
+    load_module modules/ngx_http_brotli_filter_module.so;
+    load_module modules/ngx_http_brotli_static_module.so;
+
+### Other Platforms
+
     $ cd nginx-1.x.x
     $ ./configure --add-module=/path/to/ngx_brotli
     $ make && make install
