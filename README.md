@@ -29,11 +29,22 @@ Follow installation package prompts to enable the dynamic Brotli modules in `ngi
     load_module modules/ngx_http_brotli_filter_module.so;
     load_module modules/ngx_http_brotli_static_module.so;
 
-### Other Platforms
+### Other Platforms - Dynamically loaded
+
+    $ cd nginx-1.x.x
+    $ ./configure ./configure --with-compat --add-dynamic-module=/path/to/ngx_brotli
+    $ make modules
+    
+This will result in `ngx_http_brotli_filter_module.so` and `ngx_http_brotli_static_module.so` in the `objs` directory. Copy these to `/usr/lib/nginx/modules/` then add the `load_module` lines above to `nginx.conf`.
+
+
+### Other Platforms - Statically compiled
 
     $ cd nginx-1.x.x
     $ ./configure --add-module=/path/to/ngx_brotli
     $ make && make install
+    
+This will compile the module directly into Nginx.
 
 ## Configuration directives
 
